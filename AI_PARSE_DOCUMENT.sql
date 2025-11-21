@@ -24,7 +24,6 @@ WHERE
     relative_path LIKE 'document/%';
 
 
-SELECT * FROM snowvill.mintsuyo.parse_tb;
 
 
 
@@ -50,7 +49,6 @@ FROM
 ALTER DYNAMIC TABLE snowvill.mintsuyo.flatten_tb REFRESH;
 
 
-SELECT * FROM snowvill.mintsuyo.flatten_tb;
 
 
 
