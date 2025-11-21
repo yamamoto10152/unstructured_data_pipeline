@@ -1,4 +1,4 @@
--- . Cortex AI SQLを使用して非構造化データをBronze層へ格納する
+-- 3. Cortex AI SQLを使用して非構造化データをBronze層へ格納する
 CREATE OR REPLACE TABLE snowvill.mintsuyo.extract_tb
 AS
 SELECT 

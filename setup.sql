@@ -1,0 +1,10 @@
+-- 1. 非構造データの取り込み(ステージング)
+CREATE OR REPLACE STAGE SNOWVILL.MINTSUYO.DEMO_STG
+  encryption = (type = 'snowflake_sse') 
+  DIRECTORY = (ENABLE = TRUE);
+
+-- 2. ステージのバージョン管理
+CREATE OR REPLACE STREAM SNOWVILL.MINTSUYO.DEMO_ST 
+ON DIRECTORY(@SNOWVILL.MINTSUYO.DEMO_STG);
+
+
