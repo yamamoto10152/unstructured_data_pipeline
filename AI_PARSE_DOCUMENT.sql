@@ -1,4 +1,4 @@
--- 1. AI_PARSE_DOCUMENTで社内ドキュメントを半構造化データに加工する。
+-- 2. Cortex AI SQLを使用して非構造化データをBronze層へ格納する
 CREATE OR REPLACE TABLE snowvill.mintsuyo.parse_tb
 AS
 SELECT  
@@ -28,7 +28,7 @@ SELECT * FROM snowvill.mintsuyo.parse_tb;
 
 
 
--- 2. 半構造化データをCortex Searchで使える形に加工する。
+-- 3. Bronze層へ格納したデータを構造化テーブルに変換してSilver層へ格納する。
 CREATE OR REPLACE DYNAMIC TABLE snowvill.mintsuyo.flatten_tb
 WAREHOUSE = 'SNOWSIGHT_WH'
 TARGET_LAG = DOWNSTREAM
