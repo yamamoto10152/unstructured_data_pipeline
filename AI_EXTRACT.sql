@@ -1,4 +1,4 @@
--- 1. AI_EXTRACTでPDFを半構造化データへ加工する。
+-- . Cortex AI SQLを使用して非構造化データをBronze層へ格納する
 CREATE OR REPLACE TABLE snowvill.mintsuyo.extract_tb
 AS
 SELECT 
@@ -41,8 +41,6 @@ FROM
     DIRECTORY(@SNOWVILL.MINTSUYO.DEMO_STG)
 WHERE
     relative_path LIKE 'contract/%';
-
-SELECT * FROM snowvill.mintsuyo.extract_tb;
 
 -- パイプライン内のINSERT
 INSERT INTO snowvill.mintsuyo.extract_tb
@@ -87,10 +85,7 @@ FROM
 WHERE
     relative_path LIKE 'contract/%';
 
-
-
-
--- 2. 半構造化データを構造化データへ加工する。
+-- 4. Bronze層へ格納したデータを構造化テーブルに変換してSilver層へ格納する。
 CREATE OR REPLACE DYNAMIC TABLE snowvill.mintsuyo.structured_tb 
 WAREHOUSE = 'SNOWSIGHT_WH'
 TARGET_LAG = DOWNSTREAM
