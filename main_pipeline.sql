@@ -4,7 +4,6 @@ CREATE OR REPLACE STAGE SNOWVILL.MINTSUYO.DEMO_STG
   encryption = (type = 'snowflake_sse') 
   DIRECTORY = (ENABLE = TRUE);
 
--- SELECT * FROM DIRECTORY(@YAMAMOTO_DB.DEMO_SC.DEMO_STG);
 
 -- 2. ストリームの設置
 CREATE OR REPLACE STREAM SNOWVILL.MINTSUYO.DEMO_ST 
@@ -18,86 +17,75 @@ LANGUAGE SQL
 AS
 $$
 BEGIN
-  CREATE OR REPLACE TEMPORARY TABLE staging_stream AS
+  CREATE TEMPORARY TABLE staging_stream AS
     SELECT * FROM SNOWVILL.MINTSUYO.DEMO_ST WHERE metadata$action = 'INSERT';
+
     
-  CREATE OR REPLACE TEMPORARY TABLE staging_json AS
-    SELECT
-      relative_path AS file_name,
-      AI_EXTRACT(
+INSERT INTO snowvill.mintsuyo.parse_tb
+SELECT  
+    REPLACE(relative_path, 'document/', '') AS file_name,
+    size,
+    last_modified,
+    AI_PARSE_DOCUMENT(TO_FILE('@SNOWVILL.MINTSUYO.DEMO_STG', relative_path), {'mode': 'OCR' , 'page_split': true}) AS json_data
+FROM 
+    staging_stream
+WHERE
+    relative_path LIKE 'document/%';
+
+
+INSERT INTO snowvill.mintsuyo.extract_tb
+SELECT 
+    REPLACE(relative_path, 'contract/', '') AS file_name,
+    AI_EXTRACT(
         file => TO_FILE('@SNOWVILL.MINTSUYO.DEMO_STG', relative_path),
-          responseFormat => {
-            'schema': {
-              'type': 'object',
-              'properties': {
-                        'building': {
-                            'description': '設置物件の名前は？',
+        responseFormat => {
+                'schema': {
+                    'type': 'object',
+                    'properties': {
+                        'start_date': {
+                            'description': '契約開始日は？',
                             'type': 'string'
                         },
-                        'company': {
-                            'description': '会社の名前は？',
+                        'contract_term': {
+                            'description': '契約期間は？〇か月間で答えて',
                             'type': 'string'
                         },
-                        'check_date': {
-                            'description': '点検時期は1年のうち何月？',
+                        'remuneration': {
+                            'description': '固定報酬は？（税別）は消して',
                             'type': 'string'
                         },
-                        'total': {
-                            'description': '点検料金の総額は？',
+                        'acceptance': {
+                            'description': '検収の納入日は？〇営業日以内で答えて',
                             'type': 'string'
                         },
-                        'subscribe': {
-                            'description': '第5条の４に書かれている文章のアンダーライン（下線）が引かれているテキストのみ抽出',
+                        'nad_term': {
+                            'description': '機密保持の義務期間は？',
                             'type': 'string'
                         },
-                        'term': {
-                            'description': '契約の有効期間は？',
+                        'guarantee': {
+                            'description': '保証は納入後何日間？',
                             'type': 'string'
                         }
                     }
                 }
             }
         ) AS json_data
-    FROM 
-        staging_stream;
+FROM 
+    staging_stream
+WHERE
+    relative_path LIKE 'contract/%';
 
-    INSERT INTO yamamoto.ug_handson.bronze_json 
-    SELECT * FROM staging_json;
-    
-
-    CREATE OR REPLACE TEMPORARY TABLE staging_silver AS
-    SELECT
-    file_name,
-    json_data:error AS result,
-    json_data:response:building::STRING AS building,
-    json_data:response:company::STRING AS company,
-    json_data:response:check_date::STRING AS check_date,
-    json_data:response:total::STRING AS total,
-    json_data:response:subscribe::STRING AS subscribe,
-    json_data:response:term::STRING AS term
-    FROM staging_json;
-
-
-    INSERT INTO yamamoto.ug_handson.silver_json
-    SELECT * FROM staging_silver;
+    ALTER DYNAMIC TABLE snowvill.mintsuyo.flatten_tb REFRESH;
+    ALTER DYNAMIC TABLE snowvill.mintsuyo.structured_tb  REFRESH;
 
 
 
-    INSERT INTO yamamoto.ug_handson.silver_error
-    SELECT 
-        file_name, 
-        result
-    FROM yamamoto.ug_handson.silver_json
-    WHERE 
-        result != 'null' 
-        OR building != 'None' 
-        OR company != 'None' 
-        OR check_date != 'None' 
-        OR total != 'None' 
-        OR subscribe != 'None'
-        OR term != 'None';
+
+
 
     DROP TABLE staging_stream;
+
+    ALTER CORTEX SEARCH SERVICE snowvill.mintsuyo.mintsuyo_search REFRESH;
     
     RETURN TRUE;
 END;
@@ -106,11 +94,11 @@ $$;
 
 -- 4. ストリーム検知のタスク実行
 CREATE OR REPLACE TASK triggered_task_stream
-  WAREHOUSE = YAMAMOTO_WH
-  WHEN SYSTEM$STREAM_HAS_DATA('ug_handson_stream')
+  WAREHOUSE = SNOWSIGHT_WH
+  WHEN SYSTEM$STREAM_HAS_DATA('SNOWVILL.MINTSUYO.DEMO_ST')
   AS
   CALL
-  DATA_PROCESSING_PIPELINE();
+  SNOWVILL.MINTSUYO.UNSTRUCTURED_PIPELINE();
 
 
 

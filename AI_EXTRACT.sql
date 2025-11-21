@@ -1,10 +1,3 @@
-CREATE OR REPLACE STREAM SNOWVILL.MINTSUYO.DEMO_ST 
-ON DIRECTORY(@SNOWVILL.MINTSUYO.DEMO_STG);
-
-SELECT * FROM SNOWVILL.MINTSUYO.DEMO_ST;
-
-
-
 -- 1. AI_EXTRACTでPDFを半構造化データへ加工する。
 CREATE OR REPLACE TABLE snowvill.mintsuyo.extract_tb
 AS
@@ -51,7 +44,7 @@ WHERE
 
 SELECT * FROM snowvill.mintsuyo.extract_tb;
 
-
+-- パイプライン内のINSERT
 INSERT INTO snowvill.mintsuyo.extract_tb
 SELECT 
     REPLACE(relative_path, 'contract/', '') AS file_name,
@@ -90,7 +83,7 @@ SELECT
             }
         ) AS json_data
 FROM 
-    SNOWVILL.MINTSUYO.DEMO_ST
+    staging_stream
 WHERE
     relative_path LIKE 'contract/%';
 
