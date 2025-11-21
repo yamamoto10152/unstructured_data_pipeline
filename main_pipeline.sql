@@ -1,4 +1,3 @@
-
 -- 1. ステージの設置
 CREATE OR REPLACE STAGE SNOWVILL.MINTSUYO.DEMO_STG
   encryption = (type = 'snowflake_sse') 
@@ -19,81 +18,74 @@ $$
 BEGIN
   CREATE TEMPORARY TABLE staging_stream AS
     SELECT * FROM SNOWVILL.MINTSUYO.DEMO_ST WHERE metadata$action = 'INSERT';
+  
+  INSERT INTO snowvill.mintsuyo.parse_tb
+  SELECT  
+      REPLACE(relative_path, 'document/', '') AS file_name,
+      size,
+      last_modified,
+      AI_PARSE_DOCUMENT(TO_FILE('@SNOWVILL.MINTSUYO.DEMO_STG', relative_path), {'mode': 'OCR' , 'page_split': true}) AS json_data
+  FROM 
+      staging_stream
+  WHERE
+      relative_path LIKE 'document/%';
 
-    
-INSERT INTO snowvill.mintsuyo.parse_tb
-SELECT  
-    REPLACE(relative_path, 'document/', '') AS file_name,
-    size,
-    last_modified,
-    AI_PARSE_DOCUMENT(TO_FILE('@SNOWVILL.MINTSUYO.DEMO_STG', relative_path), {'mode': 'OCR' , 'page_split': true}) AS json_data
-FROM 
-    staging_stream
-WHERE
-    relative_path LIKE 'document/%';
+  INSERT INTO snowvill.mintsuyo.extract_tb
+  SELECT 
+      REPLACE(relative_path, 'contract/', '') AS file_name,
+      AI_EXTRACT(
+          file => TO_FILE('@SNOWVILL.MINTSUYO.DEMO_STG', relative_path),
+          responseFormat => {
+                  'schema': {
+                      'type': 'object',
+                      'properties': {
+                          'start_date': {
+                              'description': '契約開始日は？',
+                              'type': 'string'
+                          },
+                          'contract_term': {
+                              'description': '契約期間は？〇か月間で答えて',
+                              'type': 'string'
+                          },
+                          'remuneration': {
+                              'description': '固定報酬は？（税別）は消して',
+                              'type': 'string'
+                          },
+                          'acceptance': {
+                              'description': '検収の納入日は？〇営業日以内で答えて',
+                              'type': 'string'
+                          },
+                          'nad_term': {
+                              'description': '機密保持の義務期間は？',
+                              'type': 'string'
+                          },
+                          'guarantee': {
+                              'description': '保証は納入後何日間？',
+                              'type': 'string'
+                          }
+                      }
+                  }
+              }
+          ) AS json_data
+  FROM 
+      staging_stream
+  WHERE
+      relative_path LIKE 'contract/%';
 
+  ALTER DYNAMIC TABLE snowvill.mintsuyo.flatten_tb REFRESH;
+  ALTER DYNAMIC TABLE snowvill.mintsuyo.structured_tb REFRESH;
 
-INSERT INTO snowvill.mintsuyo.extract_tb
-SELECT 
-    REPLACE(relative_path, 'contract/', '') AS file_name,
-    AI_EXTRACT(
-        file => TO_FILE('@SNOWVILL.MINTSUYO.DEMO_STG', relative_path),
-        responseFormat => {
-                'schema': {
-                    'type': 'object',
-                    'properties': {
-                        'start_date': {
-                            'description': '契約開始日は？',
-                            'type': 'string'
-                        },
-                        'contract_term': {
-                            'description': '契約期間は？〇か月間で答えて',
-                            'type': 'string'
-                        },
-                        'remuneration': {
-                            'description': '固定報酬は？（税別）は消して',
-                            'type': 'string'
-                        },
-                        'acceptance': {
-                            'description': '検収の納入日は？〇営業日以内で答えて',
-                            'type': 'string'
-                        },
-                        'nad_term': {
-                            'description': '機密保持の義務期間は？',
-                            'type': 'string'
-                        },
-                        'guarantee': {
-                            'description': '保証は納入後何日間？',
-                            'type': 'string'
-                        }
-                    }
-                }
-            }
-        ) AS json_data
-FROM 
-    staging_stream
-WHERE
-    relative_path LIKE 'contract/%';
+  DROP TABLE staging_stream;
 
-    ALTER DYNAMIC TABLE snowvill.mintsuyo.flatten_tb REFRESH;
-    ALTER DYNAMIC TABLE snowvill.mintsuyo.structured_tb  REFRESH;
-
-
-
-
-
-
-    DROP TABLE staging_stream;
-
-    ALTER CORTEX SEARCH SERVICE snowvill.mintsuyo.mintsuyo_search REFRESH;
-    
-    RETURN TRUE;
+  ALTER CORTEX SEARCH SERVICE snowvill.mintsuyo.mintsuyo_search REFRESH;
+  
+  RETURN TRUE;
 END;
 $$;
 
 
 -- 4. ストリーム検知のタスク実行
-CREATE OR REPLACE TASK triggered_task_stream
+CREATE OR REPLACE TASK SNOWVILL.MINTSUYO.STREAM_TRIGGER_TK
   WAREHOUSE = SNOWSIGHT_WH
   WHEN SYSTEM$STREAM_HAS_DATA('SNOWVILL.MINTSUYO.DEMO_ST')
   AS
