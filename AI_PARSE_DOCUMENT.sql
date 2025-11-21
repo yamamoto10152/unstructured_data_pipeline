@@ -45,6 +45,11 @@ SELECT
 FROM 
     snowvill.mintsuyo.parse_tb, LATERAL FLATTEN(INPUT => snowvill.mintsuyo.parse_tb.json_data, path=>'pages') AS pages;
 
+
+-- パイプライン内のREFRESH
+ALTER DYNAMIC TABLE snowvill.mintsuyo.flatten_tb REFRESH;
+
+
 SELECT * FROM snowvill.mintsuyo.flatten_tb;
 
 

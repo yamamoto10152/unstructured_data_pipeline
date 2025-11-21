@@ -109,4 +109,8 @@ SELECT
 FROM 
     snowvill.mintsuyo.extract_tb;
 
+-- パイプライン内のREFRESH
+ALTER DYNAMIC TABLE snowvill.mintsuyo.structured_tb REFRESH;
+
+
 SELECT * FROM snowvill.mintsuyo.structured_tb;
