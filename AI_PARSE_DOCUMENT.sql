@@ -11,8 +11,18 @@ FROM
 WHERE
     relative_path LIKE 'document/%';
 
+-- パイプライン内のINSERT
+INSERT INTO snowvill.mintsuyo.parse_tb
+SELECT  
+    REPLACE(relative_path, 'document/', '') AS file_name,
+    size,
+    last_modified,
+    AI_PARSE_DOCUMENT(TO_FILE('@SNOWVILL.MINTSUYO.DEMO_STG', relative_path), {'mode': 'OCR' , 'page_split': true}) AS json_data
+FROM 
+    staging_stream
+WHERE
+    relative_path LIKE 'document/%';
 
-IN
 
 SELECT * FROM snowvill.mintsuyo.parse_tb;
 
