@@ -52,7 +52,7 @@ ALTER DYNAMIC TABLE snowvill.mintsuyo.flatten_tb REFRESH;
 
 
 
--- 3. Cortex Searchを作成する
+-- 4. Cortex Searchを作成する(オプション)
 -- CREATE OR REPLACE CORTEX SEARCH SERVICE snowvill.mintsuyo.mintsuyo_search
 -- ON content
 -- ATTRIBUTES (FILE_NAME, LAST_MODIFIED, PAGECOUNT)
@@ -67,3 +67,6 @@ ALTER DYNAMIC TABLE snowvill.mintsuyo.flatten_tb REFRESH;
 --     FROM 
 --         snowvill.mintsuyo.flatten_tb
 -- );
+
+-- パイプライン内のREFRESH
+-- ALTER CORTEX SEARCH SERVICE snowvill.mintsuyo.mintsuyo_search REFRESH;
