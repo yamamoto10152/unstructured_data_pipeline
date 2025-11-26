@@ -1,29 +1,31 @@
--- データ加工処理のプロシージャ
-CREATE OR REPLACE PROCEDURE SNOWVILL.MINTSUYO.UNSTRUCTURED_PIPELINE()
+-- データ加工処理のプロシージャ(生データに近いBronze)
+CREATE OR REPLACE PROCEDURE BRONZE.SNOWVILL.UNSTRUCTURED_PIPELINE()
 RETURNS STRING
 LANGUAGE SQL
 AS
 $$
 BEGIN
   CREATE TEMPORARY TABLE staging_stream AS
-    SELECT * FROM SNOWVILL.MINTSUYO.DEMO_ST WHERE metadata$action = 'INSERT';
+    SELECT * FROM BRONZE.SNOWVILL.DEMO_ST WHERE metadata$action = 'INSERT';
+
   
-  INSERT INTO snowvill.mintsuyo.parse_tb
+  INSERT INTO BRONZE.SNOWVILL.parse_tb
   SELECT  
       REPLACE(relative_path, 'document/', '') AS file_name,
       size,
       last_modified,
-      AI_PARSE_DOCUMENT(TO_FILE('@SNOWVILL.MINTSUYO.DEMO_STG', relative_path), {'mode': 'OCR' , 'page_split': true}) AS json_data
+      AI_PARSE_DOCUMENT(TO_FILE('@BRONZE.SNOWVILL.DEMO_STG', relative_path), {'mode': 'OCR' , 'page_split': true}) AS json_data
   FROM 
       staging_stream
   WHERE
       relative_path LIKE 'document/%';
 
-  INSERT INTO snowvill.mintsuyo.extract_tb
+
+  INSERT INTO BRONZE.SNOWVILL.extract_tb
   SELECT 
       REPLACE(relative_path, 'contract/', '') AS file_name,
       AI_EXTRACT(
-          file => TO_FILE('@SNOWVILL.MINTSUYO.DEMO_STG', relative_path),
+          file => TO_FILE('@BRONZE.SNOWVILL.DEMO_STG', relative_path),
           responseFormat => {
                   'schema': {
                       'type': 'object',
@@ -61,12 +63,13 @@ BEGIN
   WHERE
       relative_path LIKE 'contract/%';
 
-  ALTER DYNAMIC TABLE snowvill.mintsuyo.flatten_tb REFRESH;
-  ALTER DYNAMIC TABLE snowvill.mintsuyo.structured_tb REFRESH;
+
+  ALTER DYNAMIC TABLE SILVER.SNOWVILL.flatten_tb REFRESH;
+  ALTER DYNAMIC TABLE SILVER.SNOWVILL.structured_tb REFRESH;
 
   DROP TABLE staging_stream;
 
-  ALTER CORTEX SEARCH SERVICE snowvill.mintsuyo.mintsuyo_search REFRESH;
+  ALTER CORTEX SEARCH SERVICE GOLD.SNOWVILL.mintsuyo_search REFRESH;
   
   RETURN TRUE;
 END;
@@ -74,9 +77,12 @@ $$;
 
 
 -- ストリーム検知のタスク実行
-CREATE OR REPLACE TASK SNOWVILL.MINTSUYO.STREAM_TRIGGER_TK
+CREATE OR REPLACE TASK BRONZE.SNOWVILL.STREAM_TRIGGER_TK
   WAREHOUSE = SNOWSIGHT_WH
-  WHEN SYSTEM$STREAM_HAS_DATA('SNOWVILL.MINTSUYO.DEMO_ST')
+  WHEN SYSTEM$STREAM_HAS_DATA('BRONZE.SNOWVILL.DEMO_ST')
   AS
   CALL
-  SNOWVILL.MINTSUYO.UNSTRUCTURED_PIPELINE();
+    BRONZE.SNOWVILL.UNSTRUCTURED_PIPELINE();
+
+-- タスク起動
+ALTER TASK BRONZE.SNOWVILL.STREAM_TRIGGER_TK RESUME;

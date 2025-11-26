@@ -1,5 +1,5 @@
 -- 2. Cortex AI SQLを使用して非構造化データをBronze層へ格納する
-CREATE OR REPLACE TABLE snowvill.mintsuyo.parse_tb
+CREATE OR REPLACE TABLE BRONZE.SNOWVILL.parse_tb
 AS
 SELECT  
     REPLACE(relative_path, 'document/', '') AS file_name,
@@ -7,12 +7,12 @@ SELECT
     last_modified,
     AI_PARSE_DOCUMENT(TO_FILE('@SNOWVILL.MINTSUYO.DEMO_STG', relative_path), {'mode': 'OCR' , 'page_split': true}) AS json_data
 FROM 
-    DIRECTORY(@SNOWVILL.MINTSUYO.DEMO_STG)
+    DIRECTORY(@BRONZE.SNOWVILL.DEMO_STG)
 WHERE
     relative_path LIKE 'document/%';
 
 -- パイプライン内のINSERT
-INSERT INTO snowvill.mintsuyo.parse_tb
+INSERT INTO BRONZE.SNOWVILL.parse_tb
 SELECT  
     REPLACE(relative_path, 'document/', '') AS file_name,
     size,
@@ -23,12 +23,15 @@ FROM
 WHERE
     relative_path LIKE 'document/%';
 
+-- 確認
+SELECT * FROM BRONZE.SNOWVILL.parse_tb;
+SELECT * FROM BRONZE.SNOWVILL.DEMO_ST;
 
 
 
 
 -- 3. Bronze層へ格納したデータを構造化テーブルに変換してSilver層へ格納する。
-CREATE OR REPLACE DYNAMIC TABLE snowvill.mintsuyo.flatten_tb
+CREATE OR REPLACE DYNAMIC TABLE SILVER.SNOWVILL.flatten_tb
 WAREHOUSE = 'SNOWSIGHT_WH'
 TARGET_LAG = DOWNSTREAM
 REFRESH_MODE = INCREMENTAL
@@ -42,31 +45,31 @@ SELECT
     index,
     value:content::varchar AS content
 FROM 
-    snowvill.mintsuyo.parse_tb, LATERAL FLATTEN(INPUT => snowvill.mintsuyo.parse_tb.json_data, path=>'pages') AS pages;
-
+    BRONZE.SNOWVILL.parse_tb, LATERAL FLATTEN(INPUT => BRONZE.SNOWVILL.parse_tb.json_data, path=>'pages') AS pages;
 
 -- パイプライン内のREFRESH
-ALTER DYNAMIC TABLE snowvill.mintsuyo.flatten_tb REFRESH;
+ALTER DYNAMIC TABLE SILVER.SNOWVILL.flatten_tb REFRESH;
 
-
+-- 確認
+SELECT * FROM SILVER.SNOWVILL.flatten_tb;
 
 
 
 -- 4. Cortex Searchを作成する(オプション)
--- CREATE OR REPLACE CORTEX SEARCH SERVICE snowvill.mintsuyo.mintsuyo_search
--- ON content
--- ATTRIBUTES (FILE_NAME, LAST_MODIFIED, PAGECOUNT)
--- WAREHOUSE = 'SNOWSIGHT_WH'
--- TARGET_LAG = '365 days'
--- AS (
---     SELECT 
---         content,
---         file_name,
---         last_modified,
---         pagecount
---     FROM 
---         snowvill.mintsuyo.flatten_tb
--- );
+CREATE OR REPLACE CORTEX SEARCH SERVICE GOLD.SNOWVILL.mintsuyo_search
+ON content
+ATTRIBUTES (FILE_NAME, LAST_MODIFIED, PAGECOUNT)
+WAREHOUSE = 'SNOWSIGHT_WH'
+TARGET_LAG = '365 days'
+AS (
+    SELECT 
+        content,
+        file_name,
+        last_modified,
+        pagecount
+    FROM 
+        SILVER.SNOWVILL.flatten_tb
+);
 
 -- パイプライン内のREFRESH
--- ALTER CORTEX SEARCH SERVICE snowvill.mintsuyo.mintsuyo_search REFRESH;
+-- ALTER CORTEX SEARCH SERVICE GOLD.SNOWVILL.mintsuyo_search REFRESH;

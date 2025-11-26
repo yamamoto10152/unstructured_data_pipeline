@@ -1,10 +1,10 @@
 -- 3. Cortex AI SQLを使用して非構造化データをBronze層へ格納する
-CREATE OR REPLACE TABLE snowvill.mintsuyo.extract_tb
+CREATE OR REPLACE TABLE BRONZE.SNOWVILL.extract_tb
 AS
 SELECT 
     REPLACE(relative_path, 'contract/', '') AS file_name,
     AI_EXTRACT(
-        file => TO_FILE('@SNOWVILL.MINTSUYO.DEMO_STG', relative_path),
+        file => TO_FILE('@BRONZE.SNOWVILL.DEMO_STG', relative_path),
         responseFormat => {
                 'schema': {
                     'type': 'object',
@@ -38,16 +38,16 @@ SELECT
             }
         ) AS json_data
 FROM 
-    DIRECTORY(@SNOWVILL.MINTSUYO.DEMO_STG)
+    DIRECTORY(@BRONZE.SNOWVILL.DEMO_STG)
 WHERE
     relative_path LIKE 'contract/%';
 
 -- パイプライン内のINSERT
-INSERT INTO snowvill.mintsuyo.extract_tb
+INSERT INTO BRONZE.SNOWVILL.extract_tb
 SELECT 
     REPLACE(relative_path, 'contract/', '') AS file_name,
     AI_EXTRACT(
-        file => TO_FILE('@SNOWVILL.MINTSUYO.DEMO_STG', relative_path),
+        file => TO_FILE('@BRONZE.SNOWVILL.DEMO_STG', relative_path),
         responseFormat => {
                 'schema': {
                     'type': 'object',
@@ -81,12 +81,18 @@ SELECT
             }
         ) AS json_data
 FROM 
-    staging_stream
+    staging_stream 
 WHERE
     relative_path LIKE 'contract/%';
 
+-- 確認
+SELECT * FROM BRONZE.SNOWVILL.extract_tb;
+SELECT * FROM BRONZE.SNOWVILL.DEMO_ST;
+
+
+
 -- 4. Bronze層へ格納したデータを構造化テーブルに変換してSilver層へ格納する。
-CREATE OR REPLACE DYNAMIC TABLE snowvill.mintsuyo.structured_tb 
+CREATE OR REPLACE DYNAMIC TABLE SILVER.SNOWVILL.structured_tb 
 WAREHOUSE = 'SNOWSIGHT_WH'
 TARGET_LAG = DOWNSTREAM
 REFRESH_MODE = INCREMENTAL
@@ -102,7 +108,10 @@ SELECT
     json_data:response:nad_term::STRING AS nad_term,
     json_data:response:guarantee::INTEGER AS guarantee
 FROM 
-    snowvill.mintsuyo.extract_tb;
+    BRONZE.SNOWVILL.extract_tb;
 
 -- パイプライン内のREFRESH
 ALTER DYNAMIC TABLE snowvill.mintsuyo.structured_tb REFRESH;
+
+-- 確認
+SELECT * FROM SILVER.SNOWVILL.structured_tb;
