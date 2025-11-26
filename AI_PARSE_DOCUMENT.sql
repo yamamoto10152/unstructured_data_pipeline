@@ -71,5 +71,5 @@ AS (
         SILVER.SNOWVILL.flatten_tb
 );
 
--- パイプライン内のREFRESH
--- ALTER CORTEX SEARCH SERVICE GOLD.SNOWVILL.mintsuyo_search REFRESH;
+-- パイプライン内のREFRESH(オプション)
+ALTER CORTEX SEARCH SERVICE GOLD.SNOWVILL.mintsuyo_search REFRESH;
