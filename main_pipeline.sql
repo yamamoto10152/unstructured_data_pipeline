@@ -9,7 +9,7 @@ BEGIN
     SELECT * FROM BRONZE.SNOWVILL.DEMO_ST WHERE metadata$action = 'INSERT';
 
   
-  INSERT INTO BRONZE.SNOWVILL.parse_tb
+  INSERT INTO SILVER.SNOWVILL.parse_tb
   SELECT  
       REPLACE(relative_path, 'document/', '') AS file_name,
       size,
@@ -21,7 +21,7 @@ BEGIN
       relative_path LIKE 'document/%';
 
 
-  INSERT INTO BRONZE.SNOWVILL.extract_tb
+  INSERT INTO SILVER.SNOWVILL.extract_tb
   SELECT 
       REPLACE(relative_path, 'contract/', '') AS file_name,
       AI_EXTRACT(
@@ -64,8 +64,8 @@ BEGIN
       relative_path LIKE 'contract/%';
 
 
-  ALTER DYNAMIC TABLE SILVER.SNOWVILL.flatten_tb REFRESH;
-  ALTER DYNAMIC TABLE SILVER.SNOWVILL.structured_tb REFRESH;
+  ALTER DYNAMIC TABLE GOLD.SNOWVILL.flatten_tb REFRESH;
+  ALTER DYNAMIC TABLE GOLD.SNOWVILL.structured_tb REFRESH;
 
   DROP TABLE staging_stream;
 

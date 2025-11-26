@@ -1,37 +1,37 @@
--- 2. Cortex AI SQLを使用して非構造化データをBronze層へ格納する
-CREATE OR REPLACE TABLE BRONZE.SNOWVILL.parse_tb
+-- 2. Cortex AI SQLを使用して非構造化データをSilver層へ格納する。(半構造化)
+CREATE OR REPLACE TABLE SILVER.SNOWVILL.parse_tb
 AS
 SELECT  
     REPLACE(relative_path, 'document/', '') AS file_name,
     size,
     last_modified,
-    AI_PARSE_DOCUMENT(TO_FILE('@SNOWVILL.MINTSUYO.DEMO_STG', relative_path), {'mode': 'OCR' , 'page_split': true}) AS json_data
+    AI_PARSE_DOCUMENT(TO_FILE('@BRONZE.SNOWVILL.DEMO_STG', relative_path), {'mode': 'OCR' , 'page_split': true}) AS json_data
 FROM 
     DIRECTORY(@BRONZE.SNOWVILL.DEMO_STG)
 WHERE
     relative_path LIKE 'document/%';
 
 -- パイプライン内のINSERT
-INSERT INTO BRONZE.SNOWVILL.parse_tb
+INSERT INTO SILVER.SNOWVILL.parse_tb
 SELECT  
     REPLACE(relative_path, 'document/', '') AS file_name,
     size,
     last_modified,
-    AI_PARSE_DOCUMENT(TO_FILE('@SNOWVILL.MINTSUYO.DEMO_STG', relative_path), {'mode': 'OCR' , 'page_split': true}) AS json_data
+    AI_PARSE_DOCUMENT(TO_FILE('@BRONZE.SNOWVILL.DEMO_STG', relative_path), {'mode': 'OCR' , 'page_split': true}) AS json_data
 FROM 
     staging_stream
 WHERE
     relative_path LIKE 'document/%';
 
 -- 確認
-SELECT * FROM BRONZE.SNOWVILL.parse_tb;
+SELECT * FROM SILVER.SNOWVILL.parse_tb;
 SELECT * FROM BRONZE.SNOWVILL.DEMO_ST;
 
 
 
 
--- 3. Bronze層へ格納したデータを構造化テーブルに変換してSilver層へ格納する。
-CREATE OR REPLACE DYNAMIC TABLE SILVER.SNOWVILL.flatten_tb
+-- 3. Silver層へ格納したデータを構造化テーブルに変換してGold層へ格納する。
+CREATE OR REPLACE DYNAMIC TABLE GOLD.SNOWVILL.flatten_tb
 WAREHOUSE = 'SNOWSIGHT_WH'
 TARGET_LAG = DOWNSTREAM
 REFRESH_MODE = INCREMENTAL
@@ -45,13 +45,13 @@ SELECT
     index,
     value:content::varchar AS content
 FROM 
-    BRONZE.SNOWVILL.parse_tb, LATERAL FLATTEN(INPUT => BRONZE.SNOWVILL.parse_tb.json_data, path=>'pages') AS pages;
+    SILVER.SNOWVILL.parse_tb, LATERAL FLATTEN(INPUT => SILVER.SNOWVILL.parse_tb.json_data, path=>'pages') AS pages;
 
 -- パイプライン内のREFRESH
-ALTER DYNAMIC TABLE SILVER.SNOWVILL.flatten_tb REFRESH;
+ALTER DYNAMIC TABLE GOLD.SNOWVILL.flatten_tb REFRESH;
 
 -- 確認
-SELECT * FROM SILVER.SNOWVILL.flatten_tb;
+SELECT * FROM GOLD.SNOWVILL.flatten_tb;
 
 
 
@@ -68,7 +68,7 @@ AS (
         last_modified,
         pagecount
     FROM 
-        SILVER.SNOWVILL.flatten_tb
+        GOLD.SNOWVILL.flatten_tb
 );
 
 -- パイプライン内のREFRESH(オプション)

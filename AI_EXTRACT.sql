@@ -1,5 +1,5 @@
--- 3. Cortex AI SQLを使用して非構造化データをBronze層へ格納する
-CREATE OR REPLACE TABLE BRONZE.SNOWVILL.extract_tb
+-- 3. Cortex AI SQLを使用して非構造化データをSilver層へ格納する。(半構造化)
+CREATE OR REPLACE TABLE SILVER.SNOWVILL.extract_tb
 AS
 SELECT 
     REPLACE(relative_path, 'contract/', '') AS file_name,
@@ -43,7 +43,7 @@ WHERE
     relative_path LIKE 'contract/%';
 
 -- パイプライン内のINSERT
-INSERT INTO BRONZE.SNOWVILL.extract_tb
+INSERT INTO SILVER.SNOWVILL.extract_tb
 SELECT 
     REPLACE(relative_path, 'contract/', '') AS file_name,
     AI_EXTRACT(
@@ -86,13 +86,13 @@ WHERE
     relative_path LIKE 'contract/%';
 
 -- 確認
-SELECT * FROM BRONZE.SNOWVILL.extract_tb;
+SELECT * FROM SILVER.SNOWVILL.extract_tb;
 SELECT * FROM BRONZE.SNOWVILL.DEMO_ST;
 
 
 
--- 4. Bronze層へ格納したデータを構造化テーブルに変換してSilver層へ格納する。
-CREATE OR REPLACE DYNAMIC TABLE SILVER.SNOWVILL.structured_tb 
+-- 4. Silver層へ格納したデータを構造化テーブルに変換してGold層へ格納する。
+CREATE OR REPLACE DYNAMIC TABLE GOLD.SNOWVILL.structured_tb 
 WAREHOUSE = 'SNOWSIGHT_WH'
 TARGET_LAG = DOWNSTREAM
 REFRESH_MODE = INCREMENTAL
@@ -108,10 +108,10 @@ SELECT
     json_data:response:nad_term::STRING AS nad_term,
     json_data:response:guarantee::INTEGER AS guarantee
 FROM 
-    BRONZE.SNOWVILL.extract_tb;
+    SILVER.SNOWVILL.extract_tb;
 
 -- パイプライン内のREFRESH
-ALTER DYNAMIC TABLE snowvill.mintsuyo.structured_tb REFRESH;
+ALTER DYNAMIC TABLE GOLD.SNOWVILL.structured_tb REFRESH;
 
 -- 確認
-SELECT * FROM SILVER.SNOWVILL.structured_tb;
+SELECT * FROM GOLD.SNOWVILL.structured_tb;
