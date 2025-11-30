@@ -101,7 +101,7 @@ AS
 SELECT
     file_name,
     json_data:error AS result,
-    TO_DATE(json_data:response:start_date::STRING, 'YYYY"年"MM"月"DD"日"') AS time_stmp,
+    TO_DATE(json_data:response:start_date::STRING, 'YYYY"年"MM"月"DD"日"') AS start_date,
     json_data:response:contract_term::INTEGER AS contract_term,
     json_data:response:remuneration::STRING AS remuneration,
     json_data:response:acceptance::INTEGER AS acceptance,
